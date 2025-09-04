@@ -34,6 +34,8 @@ const Customers = () => {
   const [showExcelModal, setShowExcelModal] = useState(false);
   //search state
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterFrequency, setFilterFrequency] = useState('All'); // Daily, Weekly, Monthly
+
   const handleAddCustomer = () => setShowModal(true);
 
   const handleSubmit = async (isBulk=false) => {
@@ -443,11 +445,14 @@ const Customers = () => {
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
             />
           </div>
-          <select className="md:w-48 px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-            <option>All Frequencies</option>
-            <option>Daily</option>
-            <option>Weekly</option>
-            <option>Monthly</option>
+          <select 
+          value={filterFrequency}
+          onChange={(e) => setFilterFrequency(e.target.value)}
+          className="md:w-48 px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+            <option value="All">All Frequencies</option>
+            <option value="Daily">Daily</option>
+            <option value="Weekly">Weekly</option>
+            <option value="Monthly">Monthly</option>
           </select>
         </div>
       </section>
@@ -455,6 +460,7 @@ const Customers = () => {
       {/* Customer Cards Grid */}
       <div className="px-4 md:px-8 lg:px-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3 mb-24">
         {customer.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        .filter(c => filterFrequency === 'All' || c.frequency === filterFrequency)
         .map((c, index) => (
           <div
             key={index}
