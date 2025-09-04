@@ -1,18 +1,18 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
-import {addCustomer, getAllCustomers, updateCustomer, deleteCustomer} from '../utils/db'
+import { addCustomer, getAllCustomers, updateCustomer, deleteCustomer } from '../utils/db'
 
 const Customers = () => {
   const [customer, setCustomer] = useState([]);
   //from db
-  useEffect (()=>{
-    async function loadCustomers(){
+  useEffect(() => {
+    async function loadCustomers() {
       const allCustomers = await getAllCustomers();
       setCustomer(allCustomers);
     }
     loadCustomers();
-  },[])
+  }, [])
   const [showModal, setShowModal] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     name: '',
@@ -26,14 +26,19 @@ const Customers = () => {
   const [editCustomerIndex, setEditCustomerIndex] = useState(null);
   const [editCustomerData, setEditCustomerData] = useState({ deposit: '', frequency: '' });
   const [showDeleteButton, setShowDeleteButton] = useState(false);
+  const [confirmIndex, setConfirmIndex] = useState(null);
+  //bulk upload using excel
+  const [bulkRows, setBulkRows] = useState([]);
+  const [bulkStats, setBulkStats] = useState([null]); //shows number of rows
 
   const handleAddCustomer = () => setShowModal(true);
 
-  const handleSubmit = async() => {
+  const handleSubmit = async (isBulk=false) => {
+    if(!isBulk){
     const depositNumber = parseFloat(newCustomer.deposit) || 0;
-    if(!newCustomer.name){alert("Name is required"); return;}
-    if(!depositNumber | depositNumber <= 0){alert("Deposit must be a positive number"); return;}
-    if(!newCustomer.frequency){alert("Please select the frequency"); return;}
+    if (!newCustomer.name) { alert("Name is required"); return; }
+    if (!depositNumber | depositNumber <= 0) { alert("Deposit must be a positive number"); return; }
+    if (!newCustomer.frequency) { alert("Please select the frequency"); return; }
     //prepare customer data
     const customerData = {
       ...newCustomer,
@@ -47,12 +52,30 @@ const Customers = () => {
     const id = await addCustomer(customerData);
 
     //update react state
-    setCustomer(prev => [...prev, {...customerData, id}]);
+    setCustomer(prev => [...prev, { ...customerData, id }]);
 
     //reset form
     setNewCustomer({ name: '', deposit: '', frequency: 'Daily' });
     setShowModal(false);
-  };
+
+}else{
+  //bulk logic
+  for (const row of bulkRows) {
+    if (!row.name || !row.deposit || !row.frequency) continue; // skip incomplete rows
+    const customerData = {
+      ...row,
+      totalCollected: 0,
+      due: row.deposit,
+      lastCollectedDate: null,
+    };
+    const id = await addCustomer(customerData);
+    setCustomer(prev => [...prev, { ...customerData, id }]);
+  }
+  setBulkRows([]);
+  setBulkStats(null);
+  alert("Bulk customers added!");
+}
+};
 
   const handleClose = () => setShowModal(false);
 
@@ -62,13 +85,13 @@ const Customers = () => {
     await deleteCustomer(custToDelete.id);
     setCustomer(customer.filter((_, i) => i !== index));
   }
-    
+
 
   const handleCollected = async (index) => {
     const today = new Date().toISOString().split("T")[0];
     const c = customer[index];
     if (c.lastCollectedDate === today) return;
-  
+
     const lastDate = c.lastCollectedDate ? new Date(c.lastCollectedDate) : null;
     let extraDue = 0;
     if (lastDate) {
@@ -76,7 +99,7 @@ const Customers = () => {
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays > 1) extraDue = (diffDays - 1) * c.deposit;
     }
-  
+
     const updatedCustomer = {
       ...c,
       totalCollected: c.totalCollected + c.deposit + extraDue,
@@ -84,26 +107,26 @@ const Customers = () => {
       lastCollectedDate: today,
       lastCollectedAmount: c.deposit + extraDue,
     };
-  
+
     // Persist first
     await updateCustomer(c.id, updatedCustomer);
-  
+
     // Update React state
     setCustomer(prev =>
       prev.map((cust, i) => (i === index ? updatedCustomer : cust))
     );
   };
-  
-  
+
+
   //handle undo
   const handleUndo = async (index) => {
     const today = new Date().toISOString().split("T")[0];
-  
+
     setCustomer(prev =>
       prev.map((c, i) => {
         if (i !== index) return c;
         if (c.lastCollectedDate !== today) return c; // only undo today
-  
+
         const updatedCustomer = {
           ...c,
           totalCollected: Math.max(c.totalCollected - (c.lastCollectedAmount || c.deposit), 0),
@@ -111,40 +134,85 @@ const Customers = () => {
           lastCollectedDate: null,
           lastCollectedAmount: 0,
         };
-  
+
         // Persist to IndexedDB
         updateCustomer(updatedCustomer.id, updatedCustomer);
-  
+
         return updatedCustomer;
       })
     );
   };
-  
-  
+
+
   // Handle updating deposit and frequency
   const handleDepositAmount = async (index, newDeposit, newFrequency) => {
-    const updatedCustomer = { 
-      ...customer[index], 
+    const updatedCustomer = {
+      ...customer[index],
       deposit: parseFloat(newDeposit) || customer[index].deposit,
       frequency: newFrequency || customer[index].frequency,
       due: Math.max((parseFloat(newDeposit) || customer[index].deposit) - customer[index].totalCollected, 0),
     };
     await updateCustomer(updatedCustomer.id, updatedCustomer); //save to db
-    setCustomer(prev => prev.map((c,i) => i == index ? updatedCustomer : c));
+    setCustomer(prev => prev.map((c, i) => i == index ? updatedCustomer : c));
   };
 
-//toggle delete button
-const handleDeleteCustomerButton = () =>{
-  setShowDeleteButton (prev => !prev);
-}
+  //toggle delete button
+  const handleDeleteCustomerButton = () => {
+    setShowDeleteButton(prev => !prev);
+  }
+
+  //handle excel file upload for bulk customer add
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const xlsx = await import('xlsx'); //dynamic import of xlsx for client
+    const data = await file.arrayBuffer();
+    const workbook = xlsx.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const raw = xlsx.utils.sheet_to_json(sheet, { defcal: '' }); //converts sheet into array of bojects
+
+    // Normalize common header variants and basic cleaning i.e mapping similar headers to one
+    const normalize = (r) => ({
+      name: String(r.Name ?? r.name ?? r.FullName ?? r.fullname ?? r.Fullname ?? '').trim(),
+      deposit: Number(r.Deposit ?? r.deposit ?? r.DepositAmount ?? r.deposite ?? r.Amount ?? r.amount ?? 0),
+      frequency: String(r.Frequency ?? r.frequency ?? r.freq ?? r.Freq ?? '').trim(),
+    })
+
+    const rows = raw.map(normalize);
+    setBulkRows(rows);
+    setBulkStats({ total: rows.length });
+  };
+
+
 
   return (
+    
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 pb-10">
-<Navbar
-  onAddCustomer={handleAddCustomer}
-  onDeleteCustomer={handleDeleteCustomerButton} // this function needs to exist in Customers.js
-  showDeleteButton={showDeleteButton}   // optional, for toggling "Delete"/"Done"
- />
+      <Navbar
+        onAddCustomer={handleAddCustomer}
+        onDeleteCustomer={handleDeleteCustomerButton} // this function needs to exist in Customers.js
+        showDeleteButton={showDeleteButton}   // optional, for toggling "Delete"/"Done"
+      />
+
+
+{/* Delete All Customers Button */}
+{/* this is just for temporary usage only delete it later */}
+<button
+  onClick={async () => {
+    if (!confirm("Are you sure you want to delete ALL customers?")) return;
+
+    const allCustomers = await getAllCustomers();
+    for (const c of allCustomers) {
+      await deleteCustomer(c.id);
+    }
+    setCustomer([]); // clear React state
+    alert("All customers deleted!");
+  }}
+  className="mt-2 w-full bg-red-600 text-white font-medium py-2.5 rounded-lg shadow hover:bg-red-700 transition active:scale-95"
+>
+  🗑 Delete All Customers
+</button>
 
 
       {/* Add Customer Modal */}
@@ -159,11 +227,12 @@ const handleDeleteCustomerButton = () =>{
             >
               &times;
             </button>
+
+            {/* Single Add Customer Form */}
             <div className="space-y-4 mt-2">
               <input
                 placeholder="Full Name"
                 value={newCustomer.name}
-                // autoComplete='Full Name'
                 required
                 onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
@@ -172,33 +241,72 @@ const handleDeleteCustomerButton = () =>{
                 type="number"
                 placeholder="Daily Deposit (₨)"
                 value={newCustomer.deposit}
-                autoComplete='number'
                 onChange={(e) => setNewCustomer({ ...newCustomer, deposit: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               />
-<select
-  value={newCustomer.frequency}
-  onChange={(e) => setNewCustomer({ ...newCustomer, frequency: e.target.value })}
-  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
->
-  <option value="" disabled>
-    -- Select The Frequency --
-  </option>
-  <option value="Daily">Daily</option>
-  <option value="Weekly">Weekly</option>
-  <option value="Monthly">Monthly</option>
-</select>
-
+              <select
+                value={newCustomer.frequency}
+                onChange={(e) => setNewCustomer({ ...newCustomer, frequency: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              >
+                <option value="" disabled>
+                  -- Select The Frequency --
+                </option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+              </select>
             </div>
+
+            {/* Add Customer Button */}
             <button
-              onClick={handleSubmit}
+              onClick={() => handleSubmit(false)}
               className="mt-6 w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium py-2.5 rounded-lg shadow hover:from-blue-700 hover:to-blue-800 transform transition active:scale-95"
             >
               ➕ Add Customer
             </button>
+
+            {/* --- NEW: Bulk upload UI --- */}
+            <div className="mt-6 border-t pt-4">
+              <p className="text-sm text-gray-700 mb-2">Or upload Excel/CSV (columns: Name, Deposit, Frequency)</p>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileUpload}
+                className="block w-full text-sm text-gray-900 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+              />
+
+              {bulkStats && (
+                <div className="mt-3 text-sm text-gray-700">
+                  <div>Total rows read: <strong>{bulkStats.total}</strong></div>
+                  {bulkRows.length > 0 && (
+                    <div className="mt-2">
+                      <div className="font-medium">Preview (first 5):</div>
+                      <ul className="list-disc ml-5 mb-3">
+                        {bulkRows.slice(0, 5).map((r, i) => (
+                          <li key={i}>
+                            {r.name || '(no name)'} — {r.deposit || 0} — {r.frequency || '(no frequency)'}
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* ✅ New Submit Button */}
+                      <button
+                        onClick={() => handleSubmit(true)}
+                        className="mt-2 w-full bg-green-600 text-white font-medium py-2.5 rounded-lg shadow hover:bg-green-700 transition active:scale-95"
+                      >
+                        ✅ Add All Customers
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       )}
+
 
       {/* Edit Modal */}
       {editModal && (
@@ -247,6 +355,34 @@ const handleDeleteCustomerButton = () =>{
         </div>
       )}
 
+      {/* confirmation modal */}
+      {confirmIndex !== null && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+            <p className="text-lg font-semibold mb-4 text-black">
+              पैसा लिनु भयो ? / Cash money collected?
+            </p>
+            <div className="flex justify-around">
+              <button
+                onClick={() => {
+                  handleCollected(confirmIndex);
+                  setConfirmIndex(null);
+                }}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg"
+              >
+                Yes / लिएँ
+              </button>
+              <button
+                onClick={() => setConfirmIndex(null)}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg"
+              >
+                No / छैन
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Customers Section */}
       <section id="customers" className="px-4 md:px-8 lg:px-12 mt-8">
         <h2 className="text-3xl font-bold text-blue-900 mb-6 flex items-center gap-2">
@@ -273,7 +409,7 @@ const handleDeleteCustomerButton = () =>{
       </section>
 
       {/* Customer Cards Grid */}
-      <div className="px-4 md:px-8 lg:px-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+      <div className="px-4 md:px-8 lg:px-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3 mb-24">
         {customer.map((c, index) => (
           <div
             key={index}
@@ -282,13 +418,13 @@ const handleDeleteCustomerButton = () =>{
             {/* Header: Name & Delete */}
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg md:text-xl font-semibold text-blue-900 truncate">{c.name}</h3>
-              {showDeleteButton &&(
+              {showDeleteButton && (
                 <button id="toggleDeleteButton"
-                onClick={() => handleDelete(index)}
-                className="text-red-500 hover:text-red-700 text-sm font-medium px-2.5 py-1.5 rounded bg-red-50 hover:bg-red-100 transition"
-              >
-                Delete
-              </button> 
+                  onClick={() => handleDelete(index)}
+                  className="text-red-500 hover:text-red-700 text-sm font-medium px-2.5 py-1.5 rounded bg-red-50 hover:bg-red-100 transition"
+                >
+                  Delete
+                </button>
               )}
             </div>
 
@@ -320,14 +456,17 @@ const handleDeleteCustomerButton = () =>{
                 Visited
               </button>
               <button
-                onClick={() => handleCollected(index)}
+                onClick={() => setConfirmIndex(index)}
                 disabled={c.lastCollectedDate === new Date().toISOString().split("T")[0]}
                 className={`px-3 py-1 rounded text-sm transition ${c.lastCollectedDate === new Date().toISOString().split("T")[0]
                   ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                   : "bg-blue-600 text-white hover:bg-blue-700"
                   }`}
               >
-                Collected
+                {
+                  c.lastCollectedDate === new Date().toISOString().split("T")[0]
+                    ? "Collected" : "Collect"
+                }
               </button>
               <button
                 onClick={() => {
