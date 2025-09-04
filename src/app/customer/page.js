@@ -30,6 +30,8 @@ const Customers = () => {
   //bulk upload using excel
   const [bulkRows, setBulkRows] = useState([]);
   const [bulkStats, setBulkStats] = useState([null]); //shows number of rows
+  //excel file upload
+  const [showExcelModal, setShowExcelModal] = useState(false);
 
   const handleAddCustomer = () => setShowModal(true);
 
@@ -78,6 +80,7 @@ const Customers = () => {
 };
 
   const handleClose = () => setShowModal(false);
+  const handleExcelFileUpload = () => setShowExcelModal(true);
 
   //handle delete
   const handleDelete = async (index) => {
@@ -193,6 +196,7 @@ const Customers = () => {
         onAddCustomer={handleAddCustomer}
         onDeleteCustomer={handleDeleteCustomerButton} // this function needs to exist in Customers.js
         showDeleteButton={showDeleteButton}   // optional, for toggling "Delete"/"Done"
+        onAddExcelFile={handleExcelFileUpload}
       />
 
 
@@ -265,47 +269,84 @@ const Customers = () => {
             >
               ➕ Add Customer
             </button>
-
-            {/* --- NEW: Bulk upload UI --- */}
-            <div className="mt-6 border-t pt-4">
-              <p className="text-sm text-gray-700 mb-2">Or upload Excel/CSV (columns: Name, Deposit, Frequency)</p>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileUpload}
-                className="block w-full text-sm text-gray-900 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700"
-              />
-
-              {bulkStats && (
-                <div className="mt-3 text-sm text-gray-700">
-                  <div>Total rows read: <strong>{bulkStats.total}</strong></div>
-                  {bulkRows.length > 0 && (
-                    <div className="mt-2">
-                      <div className="font-medium">Preview (first 5):</div>
-                      <ul className="list-disc ml-5 mb-3">
-                        {bulkRows.slice(0, 5).map((r, i) => (
-                          <li key={i}>
-                            {r.name || '(no name)'} — {r.deposit || 0} — {r.frequency || '(no frequency)'}
-                          </li>
-                        ))}
-                      </ul>
-
-                      {/* ✅ New Submit Button */}
-                      <button
-                        onClick={() => handleSubmit(true)}
-                        className="mt-2 w-full bg-green-600 text-white font-medium py-2.5 rounded-lg shadow hover:bg-green-700 transition active:scale-95"
-                      >
-                        ✅ Add All Customers
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
           </div>
         </div>
       )}
+
+
+      {/* Excel Upload Modal */}
+      {showExcelModal && (
+  <div className="fixed inset-0 flex items-center justify-center z-50 animate-fadeIn">
+    {/* Background overlay */}
+    <div
+      className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+      onClick={() => setShowExcelModal(false)}
+    ></div>
+
+    {/* Modal content */}
+    <div className="relative bg-white rounded-3xl shadow-2xl p-8 w-11/12 max-w-lg transform transition-all scale-100 hover:scale-[1.02]">
+      {/* Header */}
+      <h2 className="text-3xl font-bold mb-4 text-gray-900 border-b pb-2">Upload Excel / CSV</h2>
+
+      {/* Close button */}
+      <button
+        onClick={() => setShowExcelModal(false)}
+        className="absolute top-4 right-4 text-gray-500 hover:text-red-600 text-3xl font-bold transition duration-150"
+      >
+        &times;
+      </button>
+
+      {/* Instructions */}
+      <p className="text-sm text-gray-600 mb-4">
+        Required columns: <strong>Name, Deposit, Frequency</strong>
+      </p>
+
+      {/* File input */}
+      <input
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        onChange={handleFileUpload}
+        className="block w-full text-sm text-gray-900 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition"
+      />
+
+      {/* Bulk preview */}
+      {bulkStats && (
+        <div className="mt-6 text-gray-700">
+          <div className="mb-3 font-medium text-gray-800">Total rows read: {bulkStats.total}</div>
+
+          {bulkRows.length > 0 && (
+            <div className="space-y-3">
+              <div className="font-semibold">Preview (first 5 rows):</div>
+              <div className="grid gap-2">
+                {bulkRows.slice(0, 5).map((r, i) => (
+                  <div
+                    key={i}
+                    className="p-2 rounded-lg border border-gray-200 shadow-sm bg-gray-50 flex justify-between"
+                  >
+                    <span className="font-medium">{r.name || '(no name)'}</span>
+                    <span>₨ {r.deposit || 0}</span>
+                    <span>{r.frequency || '(no frequency)'}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add All Customers button */}
+              <button
+                onClick={() => {
+                  handleSubmit(true);
+                  setShowExcelModal(false);
+                }}
+                className="mt-4 w-full bg-green-600 text-white font-medium py-3 rounded-xl shadow hover:bg-green-700 transition active:scale-95"
+              >
+                ✅ Add All Customers
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+)}
 
 
       {/* Edit Modal */}
