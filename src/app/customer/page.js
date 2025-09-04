@@ -51,6 +51,7 @@ const Customers = () => {
       totalCollected: 0,
       due: depositNumber,
       lastCollectedDate: null,
+      startDate: new Date().toISOString().split("T")[0],
     };
 
     //save to indexDB
@@ -72,6 +73,7 @@ const Customers = () => {
       totalCollected: 0,
       due: row.deposit,
       lastCollectedDate: null,
+      startDate: new Date().toISOString().split("T")[0],
     };
     const id = await addCustomer(customerData);
     setCustomer(prev => [...prev, { ...customerData, id }]);
@@ -96,32 +98,36 @@ const Customers = () => {
   const handleCollected = async (index) => {
     const today = new Date().toISOString().split("T")[0];
     const c = customer[index];
+  
+    // Already collected today → skip
     if (c.lastCollectedDate === today) return;
-
-    const lastDate = c.lastCollectedDate ? new Date(c.lastCollectedDate) : null;
-    let extraDue = 0;
-    if (lastDate) {
-      const diffTime = new Date(today) - lastDate;
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays > 1) extraDue = (diffDays - 1) * c.deposit;
-    }
-
+  
+    // Use last collection date or start date
+    const lastDate = c.lastCollectedDate || c.startDate;
+    const lastDateObj = new Date(lastDate);
+    const todayObj = new Date(today);
+  
+    // Calculate gap in days
+    const diffTime = todayObj - lastDateObj;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const extraDue = diffDays > 1 ? (diffDays - 1) * c.deposit : 0;
+  
     const updatedCustomer = {
       ...c,
       totalCollected: c.totalCollected + c.deposit + extraDue,
-      due: 0,
+      due: 0, // ✅ reset after collecting
       lastCollectedDate: today,
       lastCollectedAmount: c.deposit + extraDue,
+      // logs: [...(c.logs || []), {date:today, amount:c.lastCollectedAmount, due: c.due}],
     };
-
-    // Persist first
+  
     await updateCustomer(c.id, updatedCustomer);
-
-    // Update React state
+  
     setCustomer(prev =>
       prev.map((cust, i) => (i === index ? updatedCustomer : cust))
     );
   };
+  
 
 
   //handle undo
