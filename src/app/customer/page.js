@@ -32,7 +32,8 @@ const Customers = () => {
   const [bulkStats, setBulkStats] = useState([null]); //shows number of rows
   //excel file upload
   const [showExcelModal, setShowExcelModal] = useState(false);
-
+  //search state
+  const [searchQuery, setSearchQuery] = useState('');
   const handleAddCustomer = () => setShowModal(true);
 
   const handleSubmit = async (isBulk=false) => {
@@ -437,6 +438,8 @@ const Customers = () => {
             <input
               type="text"
               placeholder="Search Customer..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
             />
           </div>
@@ -451,7 +454,8 @@ const Customers = () => {
 
       {/* Customer Cards Grid */}
       <div className="px-4 md:px-8 lg:px-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3 mb-24">
-        {customer.map((c, index) => (
+        {customer.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        .map((c, index) => (
           <div
             key={index}
             className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
