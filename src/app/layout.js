@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Navbar from "./components/Navbar";
 import "./globals.css";
 import Head from "next/head";
+import ServiceWorkerRegister from './ServiceWorkerRegister'
+
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -55,6 +57,10 @@ export default function RootLayout({ children }) {
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"/>
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+
+                {/* Register the service worker */}
+                <ServiceWorkerRegister />
+
       <header className="bg-blue-900 text-white p-5 shadow flex items-center justify-between gap-3">
           <div className="flex items-center gap-5 md:flex">
             <div className="w-12 h-12 md:h-14 md:w-14 bg-white rounded-full flex items-center justify-center text-blue-900 font-bold text-lg">
