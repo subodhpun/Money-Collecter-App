@@ -10,8 +10,21 @@ const nextConfig = {
     register: true,
     skipWaiting: true,
     disable: false,
+
+    // fallback page when route not cached
+    fallbacks: {
+      document: "/offline.html",
+    },
+
+    // Precache main pages for instant offline access
+    additionalManifestEntries: [
+      { url: "/", revision: "1" },
+      { url: "/customers", revision: "1" },
+      // Add other pages here if needed
+    ],
+
     runtimeCaching: [
-      // Cache _next JS files for offline
+      // Cache Next.js build files (_next/*)
       {
         urlPattern: /^\/_next\/.*$/i,
         handler: "CacheFirst",
@@ -20,31 +33,24 @@ const nextConfig = {
           expiration: { maxEntries: 100, maxAgeSeconds: 7 * 24 * 60 * 60 },
         },
       },
-      // Cache pages & routes
+
+      // Cache all app pages for offline
       {
-        urlPattern: /^https:\/\/money-collecter-app\.vercel\.app\/.*$/i,
-        handler: "NetworkFirst",
+        urlPattern: /^\/.*$/i,
+        handler: "CacheFirst", // ensures pages load from cache instantly
         options: {
           cacheName: "pages-cache",
-          expiration: { maxEntries: 100, maxAgeSeconds: 24 * 60 * 60 },
+          expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 }, // 30 days
         },
       },
+
       // Cache images
       {
         urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico)$/i,
         handler: "CacheFirst",
         options: {
           cacheName: "images-cache",
-          expiration: { maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 },
-        },
-      },
-      // Cache API calls
-      {
-        urlPattern: /^https:\/\/money-collecter-app\.vercel\.app\/api\/.*$/i,
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "api-cache",
-          expiration: { maxEntries: 50, maxAgeSeconds: 24 * 60 * 60 },
+          expiration: { maxEntries: 50, maxAgeSeconds: 30 * 24 * 60 * 60 },
         },
       },
     ],

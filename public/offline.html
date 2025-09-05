@@ -1,0 +1,12 @@
+{
+    urlPattern: /.*/i,
+    handler: "NetworkFirst",
+    options: {
+      cacheName: "fallback-cache",
+      networkTimeoutSeconds: 10,
+      expiration: { maxEntries: 50 },
+      cacheableResponse: { statuses: [0, 200] },
+    },
+    method: "GET"
+  }
+  
