@@ -1,6 +1,6 @@
 // next.config.mjs
 import withPWA from "next-pwa";
-import runtimeCaching from "next-pwa/cache.js"; // ✅ updated
+import runtimeCaching from "next-pwa/cache.js";
 
 const nextConfig = {
   reactStrictMode: true,
@@ -10,8 +10,9 @@ const nextConfig = {
     dest: "public",
     register: true,
     skipWaiting: true,
-    disable: false,
+    disable: false, // keep service worker active
     runtimeCaching: [
+      // Pages & routes
       {
         urlPattern: /^https:\/\/money-collecter-app\.vercel\.app\/.*$/,
         handler: "NetworkFirst",
@@ -20,6 +21,7 @@ const nextConfig = {
           expiration: { maxEntries: 100, maxAgeSeconds: 24 * 60 * 60 },
         },
       },
+      // Images & icons
       {
         urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico)$/,
         handler: "CacheFirst",
@@ -28,6 +30,7 @@ const nextConfig = {
           expiration: { maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 },
         },
       },
+      // API calls
       {
         urlPattern: /^https:\/\/money-collecter-app\.vercel\.app\/api\/.*$/,
         handler: "NetworkFirst",
@@ -36,7 +39,13 @@ const nextConfig = {
           expiration: { maxEntries: 50, maxAgeSeconds: 24 * 60 * 60 },
         },
       },
-      ...runtimeCaching,
+      // Exclude _next/* dynamic files from precache
+      ...runtimeCaching.map(rule => {
+        if (rule.urlPattern.source.includes("_next")) {
+          return { ...rule, handler: "NetworkFirst" }; // do NOT precache _next build files
+        }
+        return rule;
+      }),
     ],
   },
 };
