@@ -10,7 +10,7 @@ const nextConfig = {
     dest: "public",
     register: true,
     skipWaiting: true,
-    disable: false, // keep service worker active
+    disable: false,
     runtimeCaching: [
       // Pages & routes
       {
@@ -39,10 +39,11 @@ const nextConfig = {
           expiration: { maxEntries: 50, maxAgeSeconds: 24 * 60 * 60 },
         },
       },
-      // Exclude _next/* dynamic files from precache
+      // Safely handle next-pwa default runtimeCaching
       ...runtimeCaching.map(rule => {
-        if (rule.urlPattern.source.includes("_next")) {
-          return { ...rule, handler: "NetworkFirst" }; // do NOT precache _next build files
+        if (rule.urlPattern instanceof RegExp && rule.urlPattern.source.includes("_next")) {
+          // _next/* dynamic files should use NetworkFirst
+          return { ...rule, handler: "NetworkFirst" };
         }
         return rule;
       }),
