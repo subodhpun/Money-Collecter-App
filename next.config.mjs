@@ -1,60 +1,60 @@
-// next.config.mjs
 import withPWA from "next-pwa";
+import { join } from "path";
 
-const nextConfig = {
+const nextConfig = withPWA({
   reactStrictMode: true,
   swcMinify: true,
-
   pwa: {
-    dest: "public",
+    dest: "public",          // service worker and manifest go here
     register: true,
     skipWaiting: true,
     disable: false,
-
-    // fallback page when route not cached
-    fallbacks: {
-      document: "/offline.html",
-    },
-
-    // Precache main pages for instant offline access
-    additionalManifestEntries: [
-      { url: "/", revision: "1" },
-      { url: "/customers", revision: "1" },
-      // Add other pages here if needed
+    // Glob patterns for precaching all static files including _next chunks
+    globPatterns: [
+      "**/*.{js,css,html,png,jpg,jpeg,svg,ico,json,woff,woff2,eot,ttf,otf}"
     ],
-
+    additionalManifestEntries: [
+      { url: "/", revision: null },           // src/page.js
+      { url: "/customer", revision: null },   // src/customer/page.js
+      { url: "/export", revision: null },     // src/export/page.js
+      // add more pages if needed
+    ],
     runtimeCaching: [
-      // Cache Next.js build files (_next/*)
       {
         urlPattern: /^\/_next\/.*$/i,
         handler: "CacheFirst",
         options: {
-          cacheName: "nextjs-cache",
-          expiration: { maxEntries: 100, maxAgeSeconds: 7 * 24 * 60 * 60 },
+          cacheName: "nextjs-chunks-cache",
+          expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 }, // 30 days
         },
       },
-
-      // Cache all app pages for offline
       {
         urlPattern: /^\/.*$/i,
-        handler: "CacheFirst", // ensures pages load from cache instantly
+        handler: "NetworkFirst",
         options: {
           cacheName: "pages-cache",
-          expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 }, // 30 days
+          networkTimeoutSeconds: 5,
+          expiration: { maxEntries: 50 },
         },
       },
-
-      // Cache images
       {
-        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico)$/i,
+        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico|webp|avif)$/i,
         handler: "CacheFirst",
         options: {
           cacheName: "images-cache",
-          expiration: { maxEntries: 50, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          expiration: { maxEntries: 100, maxAgeSeconds: 60 * 24 * 60 * 60 }, // 60 days
+        },
+      },
+      {
+        urlPattern: /\.(?:woff|woff2|eot|ttf|otf)$/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "fonts-cache",
+          expiration: { maxEntries: 50, maxAgeSeconds: 365 * 24 * 60 * 60 }, // 1 year
         },
       },
     ],
   },
-};
+});
 
 export default withPWA(nextConfig);
